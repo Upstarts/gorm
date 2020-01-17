@@ -92,8 +92,9 @@ func (s *postgres) DataTypeOf(field *StructField) string {
 }
 
 func (s postgres) HasIndex(tableName string, indexName string) bool {
+	schemaName, tableName := schemaAndTable(tableName)
 	var count int
-	s.db.QueryRow("SELECT count(*) FROM pg_indexes WHERE tablename = $1 AND indexname = $2 AND schemaname = CURRENT_SCHEMA()", tableName, indexName).Scan(&count)
+	s.db.QueryRow("SELECT count(*) FROM pg_indexes WHERE tablename = $1 AND indexname = $2 AND schemaname = $3", tableName, indexName, schemaName).Scan(&count)
 	return count > 0
 }
 
@@ -104,14 +105,16 @@ func (s postgres) HasForeignKey(tableName string, foreignKeyName string) bool {
 }
 
 func (s postgres) HasTable(tableName string) bool {
+	schemaName, tableName := schemaAndTable(tableName)
 	var count int
-	s.db.QueryRow("SELECT count(*) FROM INFORMATION_SCHEMA.tables WHERE table_name = $1 AND table_type = 'BASE TABLE' AND table_schema = CURRENT_SCHEMA()", tableName).Scan(&count)
+	s.db.QueryRow("SELECT count(*) FROM INFORMATION_SCHEMA.tables WHERE table_name = $1 AND table_type = 'BASE TABLE' AND table_schema = $2", tableName, schemaName).Scan(&count)
 	return count > 0
 }
 
 func (s postgres) HasColumn(tableName string, columnName string) bool {
+	schemaName, tableName := schemaAndTable(tableName)
 	var count int
-	s.db.QueryRow("SELECT count(*) FROM INFORMATION_SCHEMA.columns WHERE table_name = $1 AND column_name = $2 AND table_schema = CURRENT_SCHEMA()", tableName, columnName).Scan(&count)
+	s.db.QueryRow("SELECT count(*) FROM INFORMATION_SCHEMA.columns WHERE table_name = $1 AND column_name = $2 AND table_schema = $3", tableName, columnName, schemaName).Scan(&count)
 	return count > 0
 }
 
@@ -144,4 +147,12 @@ func isUUID(value reflect.Value) bool {
 func isJSON(value reflect.Value) bool {
 	_, ok := value.Interface().(json.RawMessage)
 	return ok
+}
+
+func schemaAndTable(tableName string) (string, string) {
+	if strings.Contains(tableName, ".") {
+		splitStrings := strings.SplitN(tableName, ".", 2)
+		return splitStrings[0], splitStrings[1]
+	}
+	return "CURRENT_SCHEMA()", tableName
 }
